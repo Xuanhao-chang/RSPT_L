@@ -95,23 +95,20 @@
 
     DATVER   = 'Jul 17, 2021, Sat 9:00'
     NUMVER   = 0100
-    MOLECULE = 'D2DIsoHO'!'2DIsoHO'        !'C2H2'           !'CO2'                       ! Type of Molecule
-    NQ       = 4                    ! 4                          ! Number of Normal Mode , 4 For CO2, 7 For C2H2
-    NSAYVETZ = 0                                             ! Sayvetz Condition, L = 0, 1, 2,...
-    ALLOCATE (   W  (NQ   ))
-
-    W(1) = 100.0D0
-    W(2) = 100.0D0
-    W(3) = 110.0D0
-    W(4) = 110.0D0
+    !MOLECULE = 'C2H2'!'2DIsoHO'        !'C2H2'           !'CO2'                       ! Type of Molecule
+    !NQ       = 7                    ! 4                          ! Number of Normal Mode , 4 For CO2, 7 For C2H2
+    !NSAYVETZ = 0                                             ! Sayvetz Condition, L = 0, 1, 2,...
+    !ALLOCATE (   W  (NQ   ))
+    !W(1) = 100.0D0
+    !W(2) = 100.0D0
+    !W(3) = 110.0D0
+    !W(4) = 110.0D0
     !W(1) = 1.0D0
     !W(2) = 1.0D0
-    
-    !W(1) = 0.1353779746D+04      ! Normal Frequencies of CO2
-    !W(2) = 0.2396532220D+04      !
-    !W(3) = 0.6728925740D+03      !
-    !W(4) = 0.6728925740D+03      !
-
+    !W(1) = 0.1353779746D+04     ! Normal Frequencies of CO2
+    !W(2) = 0.2396532220D+04     !
+    !W(3) = 0.6728925740D+03     !
+    !W(4) = 0.6728925740D+03     !
     !W(1) = 0.35068570D+04       ! Normal Frequencies of C2H2
     !W(2) = 0.20111680D+04       !
     !W(3) = 0.34143540D+04       !
@@ -154,14 +151,14 @@
          IF (KEYWOR16(1:10) .EQ. '# PATH_OUT') PATH_OUT = LINE                  !  Taylor series output .dat directory
          IF (KEYWOR16(1:10) .EQ. '# PATH_BIN') PATH_BIN = LINE                  !  Working directory for binary data (operators), .bin
 
-!         IF (KEYWOR16(1:10) .EQ. '# PARA_MOL') FILE_MOL = LINE                 !  ANCO import data path for *.mol
+         IF (KEYWOR16(1:10) .EQ. '# PARA_MOL') FILE_MOL = LINE                 !  ANCO import data path for *.mol
          IF (KEYWOR16(1:10) .EQ. '# RSPT_INP') FILE_INP = LINE                  !  RSPT input parameters file, RSPT_mol_MP2_cc-pVTZ.inp
          IF (KEYWOR16(1:10) .EQ. '# RSPT_LST') FILE_LST = LINE                  !  RSPT results output file, RSPT_CO2.txt
 
          IF (KEYWOR16(1:10) .EQ. '# LIST_LVL')                            &
      &      READ (UNIT = LINE, FMT = "(I4)", IOSTAT = IOS) LOUT                 !  Output level (0 = min, 1 = regular, 2 = full)
-!         IF (KEYWOR16(1:10) .EQ. '# ACCURACY')                            &
-!     &      READ (UNIT = LINE, FMT = "(I4)", IOSTAT = IOS) NACCURMP            !  FM accuracy
+         IF (KEYWOR16(1:10) .EQ. '# ACCURACY')                            &
+     &      READ (UNIT = LINE, FMT = "(I4)", IOSTAT = IOS) NACCURMP            !  FM accuracy
       ENDDO
       REWIND (NAUX)
 
@@ -175,6 +172,30 @@
       END DO
       CLOSE (NAUX)
       WRITE (NOUT,"(112('-'))")
+!-----------------------------------------------------------------------------------------------
+!     Read parameters in .mol file
+!-----------------------------------------------------------------------------------------------
+      FILE_MOL = TRIM(PATH_CUR) // TRIM(FILE_MOL)
+      OPEN (UNIT = NAUX, ACTION = 'READ', FORM = 'FORMATTED', FILE = FILE_MOL, ERR = 920)
+
+      DO WHILE (.NOT. EOF(NAUX))
+          READ (NAUX,1200) KEYWOR, LINE
+          IF (KEYWOR(1:1) .EQ. '!') CYCLE
+          IF (KEYWOR .EQ. 'MOLE_NAM')      THEN
+              MOLECULE = TRIM(LINE)
+          ELSE IF (KEYWOR .EQ. 'SAYV_CON') THEN
+              READ (UNIT = LINE, FMT = '(I4)') NSAYVETZ
+          ELSE IF (KEYWOR .EQ. 'NORM_MOD') THEN
+              READ (UNIT = LINE, FMT = '(I4)') NQ
+              ALLOCATE(W(NQ))
+              DO I = 1, NQ
+                  READ (NAUX, '(8X,F24.16)') W(I)
+              ENDDO
+          ELSE IF (KEYWOR .EQ. 'END_FILE') THEN
+              EXIT
+          ENDIF    
+      ENDDO      
+      CLOSE (NAUX)      
 !-----------------------------------------------------------------------------------------------
 !     Check for existance of the input file:
 !-----------------------------------------------------------------------------------------------
@@ -281,7 +302,6 @@
 !----------------------------------------------------------------------------
       WRITE (NOUT,1300) REAL(NUMVER)/100.0,DATVER,MOLECULE
       CALL TIMDAT (NOUT)
-
       WRITE (*,1300) REAL(NUMVER)/100.0,DATVER,MOLECULE
       CALL TIMDAT (0)
 
@@ -296,7 +316,6 @@
      &   'Version : ',F6.2/                                               &
      &   'Date    : ',A24/                                                &
      &   'Molecule: ',A64/)
-
 
 !----    Initialize filenames for different orders of the Hamiltonian
       NHORD = 0  !  Vector assignment
@@ -410,7 +429,6 @@
 !     Prepare Angular Momentum L(z)
 !     Read Lz file from Mathematica Output File
 !-------------------------------------------------------------------------------
-
       WRITE (FMT = "('Lz_',A,'.txt')", UNIT = FILE) TRIM(MOLECULE)
       FILE_LZ    =  TRIM(PATH_BIN)// TRIM(FILE)
       OPEN(UNIT=NINP, FILE=FILE_LZ, FORM = "FORMATTED", ACTION = "READ")
@@ -422,9 +440,7 @@
       REWIND(NINP)
 
       NTLZ = NTERL
-
       ALLOCATE(LCOEF (NTLZ     ),LADLZ(NQ,2,NTLZ ))
-
       NTERL = 1
       DO WHILE (.NOT. EOF(NINP))
           READ(NINP, "(I4,2(1X,F32.16),20(1X,I1))", IOSTAT = IOS) N, RE, IM, &
@@ -432,7 +448,6 @@
           LCOEF(NTERL) = CMPLX(RE,IM, KIND = 8)
           NTERL        = NTERL + 1
       ENDDO
-
 !-----------------------------------------------------------------------------------------------
 !     Create/read specifications of vibrational states of interest:             !  2000
 !     IQUANT(vector, j = 0..NSTATE)
@@ -832,16 +847,34 @@
      ALLOCATE( LZMAT (MVIRT,MVIRT), STAT = IERR)
      LOCERR =  9;  IF (IERR .NE. 0) GO TO 990
 
+     ICOUNT = 0
+     MCOUNT = MVIRT * (MVIRT + 1) / 2
+     CALL LWATCH (LSPLIT1)   
+     ICENT0 = 0
+     CALL WATCH (ISPLIT)                                                     
+     WRITE (*,405) NVIRT,NTLZ
+     CALL COUNTER (0,0,1)                                                    
+405  FORMAT (/'Evaluate L_z matrix:',I8,' states,',I8,' terms ...'\)      
+
      DO 420 K = 0, NVIRT
-     DO 420 L = 0, NVIRT
+     DO 420 L = 0, K
+         ICOUNT = ICOUNT + 1
+         ICENT1 = 100 * ICOUNT / MCOUNT      
+         IF (ICENT1 .NE. ICENT0) THEN
+             CALL COUNTER (1,ICENT1,1)                                         
+             ICENT0 = ICENT1 
+         ENDIF
          DO 410 Q = 1, NQ
              IOPBRA(Q) = IVIRTU(Q,K) + 1
              IOPKET(Q) = IVIRTU(Q,L) + 1
 410       CONTINUE
           ELEMAT = LZELE  (NQ,NTLZ,LCOEF,LADLZ,IOPBRA,IOPKET)
           LZMAT(K+1,L+1) = ELEMAT
+          LZMAT(L+1,K+1) = ELEMAT
 420  CONTINUE
-
+      
+     CALL COUNTER (1,-1,1) 
+     CALL WATCH2 (ISPLIT)
      DEALLOCATE (LCOEF, LADLZ)
 
      IF (LOUT .EQ. 2) THEN
@@ -850,7 +883,6 @@
              WRITE (NOUT,"(200(1X,F10.5))") (IMAG(LZMAT(I,J)), I=1,MVIRT)
          ENDDO
      ENDIF
-
 !--------------------------------------------
 !   LAPACK is Used in the VCI PROCEDURE
 !
@@ -906,34 +938,61 @@
       WRITE(NOUT,*)
 
       ALLOCATE(COPY1(MVIRT,1))
-      DO MODE = 0, 1
-          IVIRTUL = 0
-          DO I = 1, MVIRT
-              !EIGVL = REAL(NSAYVETZ, KIND=16) - ABS(DIAG(I))                          !
-         ! IF ( ABS(EIGVL) < TOLCUT  ) THEN                                            ! Select Eigenstates with L = 0,1,2,...
-                  IVIRTUL = IVIRTUL + 1                                               !
-                  IF (MODE .EQ. 0 .AND. LOUT .EQ. 2) THEN                             !
-                      WRITE (NOUT,"(   F10.5)")  DIAG(I)                              !
-                      WRITE (NOUT,"(200(1X,F10.5))") (REAL(LZMAT(J,I)), J=1,MVIRT)         !
-                      WRITE (NOUT,"(200(1X,F10.5))") (IMAG(LZMAT(J,I)), J=1,MVIRT)         !
-                  ENDIF                                                               !
-                  IF (MODE .EQ. 1) THEN                                               !
-                      DO J = 1, MVIRT                                                 !
-                          COPY1(J,1) = LZMAT(J, I)                                    ! For l=0, Eigenvector LZMAT is not always Real
-                          PROJECT (IVIRTUL, J) = COPY1(J,1)                           !
-                          PROJTRAN(J, IVIRTUL) = CONJG(COPY1(J,1))                    !
-                      ENDDO                                                           !
-                  ENDIF                                                               !
-          !ENDIF                                                                       !
+      IF (NQEX .EQ. 0) THEN
+          DO MODE = 0, 1
+              IVIRTUL = 0
+              DO I = 1, MVIRT
+                      IVIRTUL = IVIRTUL + 1                                               !
+                      IF (MODE .EQ. 0 .AND. LOUT .EQ. 2) THEN                             !
+                          WRITE (NOUT,"(   F10.5)")  DIAG(I)                              !
+                          WRITE (NOUT,"(200(1X,F10.5))") (REAL(LZMAT(J,I)), J=1,MVIRT)    !
+                          WRITE (NOUT,"(200(1X,F10.5))") (IMAG(LZMAT(J,I)), J=1,MVIRT)    !
+                      ENDIF                                                               !
+                      IF (MODE .EQ. 1) THEN                                               !
+                          DO J = 1, MVIRT                                                 !
+                              COPY1(J,1) = LZMAT(J, I)                                    !
+                              PROJECT (IVIRTUL, J) = COPY1(J,1)                           !
+                              PROJTRAN(J, IVIRTUL) = CONJG(COPY1(J,1))                    !
+                          ENDDO                                                           !
+                      ENDIF                                                               !                                                                  !
+              ENDDO
+              IF (MODE .EQ. 0 ) THEN
+                  ALLOCATE(PROJECT (IVIRTUL, MVIRT))
+                  ALLOCATE(PROJTRAN(MVIRT, IVIRTUL))
+                  PROJECT  = 0
+                  PROJTRAN = 0
+              ENDIF
           ENDDO
-          IF (MODE .EQ. 0 ) THEN
-              ALLOCATE(PROJECT (IVIRTUL, MVIRT))
-              ALLOCATE(PROJTRAN(MVIRT, IVIRTUL))
-              PROJECT  = 0
-              PROJTRAN = 0
-          ENDIF
-      ENDDO
-
+      ELSE      
+          DO MODE = 0, 1
+              IVIRTUL = 0
+              DO I = 1, MVIRT
+                  EIGVL = REAL(NSAYVETZ, KIND=16) - ABS(DIAG(I))                          !
+              IF ( ABS(EIGVL) < TOLCUT  ) THEN                                            ! Select Eigenstates with L = 0,1,2,...
+                      IVIRTUL = IVIRTUL + 1                                               !
+                      IF (MODE .EQ. 0 .AND. LOUT .EQ. 2) THEN                             !
+                          WRITE (NOUT,"(   F10.5)")  DIAG(I)                              !
+                          WRITE (NOUT,"(200(1X,F10.5))") (REAL(LZMAT(J,I)), J=1,MVIRT)         !
+                          WRITE (NOUT,"(200(1X,F10.5))") (IMAG(LZMAT(J,I)), J=1,MVIRT)         !
+                      ENDIF                                                               !
+                      IF (MODE .EQ. 1) THEN                                               !
+                          DO J = 1, MVIRT                                                 !
+                              COPY1(J,1) = LZMAT(J, I)                                    ! For l=0, Eigenvector LZMAT is not always Real
+                              PROJECT (IVIRTUL, J) = COPY1(J,1)                           !
+                              PROJTRAN(J, IVIRTUL) = CONJG(COPY1(J,1))                    !
+                          ENDDO                                                           !
+                      ENDIF                                                               !
+              ENDIF                                                                       !
+              ENDDO
+              IF (MODE .EQ. 0 ) THEN
+                  ALLOCATE(PROJECT (IVIRTUL, MVIRT))
+                  ALLOCATE(PROJTRAN(MVIRT, IVIRTUL))
+                  PROJECT  = 0
+                  PROJTRAN = 0
+              ENDIF
+          ENDDO 
+      ENDIF
+      
       DEALLOCATE(COPY1, LZMAT, DIAG)
 !-----------------------------------------------------------------------------------------------!
 !      WRITE(NOUT,"(/'Projector Opearator : '/)")                                               !
@@ -1070,7 +1129,7 @@
       ENDIF
 
 !---  The Calculating Accuracy should be Improved ! 
-      
+
 !==================================================================================================      
       WRITE(NOUT, 1800)
       WRITE( *  ,    *)
@@ -1501,42 +1560,41 @@
         GAUCON = - LOG (WGTMIN) / FRAME ** 2  
         
         WRITE (NOUT,3200) GAUCON,FRAME,WGTMIN*100.0D0
+
+        IF (LSTATE .EQ. 1) THEN
+           COMPMX = 0.0D0  !  Maximum component
+           LST = 0
+           DO 530 J = 1, IVIRTUL
+              COMP = REAL(ABS (HAMATRE(LSTATE,J)), KIND=16)                                     !  ABS
+              IF (COMP .GT. COMPMX) THEN                                                        ! ENERHARM
+                 COMPMX = COMP
+                 ENERCI(LSTATE) = REAL(EIGVAL(  J), KIND=16)
+                 LST = J
+              ENDIF
+  530      CONTINUE
+           IASSIG(LST) = 1
+        ELSE
+           COMPMX = 0.0D0
+           LST = 0
+           DO 540 J = 1, IVIRTUL
+              IF (IASSIG(J) .EQ. 1) CYCLE
+              DIFF = EIGVAL(J) - ENERHARM(LSTATE)
+              DELTA = DIFF                                                        
+              WEIGHT = EXP (-GAUCON * DELTA ** 2)                                 !  EXP
+              WEIGHT = MAX (WEIGHT, WGTMIN)                                       !  MAX
+              COMP   = WEIGHT * REAL(ABS (HAMATRE(LSTATE,J)),KIND=16)           !  ABS
+              IF (COMP .GT. COMPMX) THEN                              
+                 COMPMX = COMP
+                 ENERCI(LSTATE) = REAL(EIGVAL(J), KIND=16)
+                 LST = J
+              ENDIF
+  540      CONTINUE
+           IASSIG(LST) = 1
+        ENDIF
         
-!        IF (NQEX .NE. 0 ) THEN
-            IF (LSTATE .EQ. 1) THEN
-               COMPMX = 0.0D0  !  Maximum component
-               LST = 0
-               DO 530 J = 1, IVIRTUL
-                  COMP = REAL(ABS (HAMATRE(LSTATE,J)), KIND=16)                                     !  ABS
-                  IF (COMP .GT. COMPMX) THEN                                                        ! ENERHARM
-                     COMPMX = COMP
-                     ENERCI(LSTATE) = REAL(EIGVAL(  J), KIND=16)
-                     LST = J
-                  ENDIF
-  530          CONTINUE
-               IASSIG(LST) = 1
-            ELSE
-               COMPMX = 0.0D0
-               LST = 0
-               DO 540 J = 1, IVIRTUL
-                  IF (IASSIG(J) .EQ. 1) CYCLE
-                  DIFF = EIGVAL(J) - ENERHARM(LSTATE)
-                  DELTA = DIFF                                                        
-                  WEIGHT = EXP (-GAUCON * DELTA ** 2)                                 !  EXP
-                  WEIGHT = MAX (WEIGHT, WGTMIN)                                       !  MAX
-                  COMP   = WEIGHT * REAL(ABS (HAMATRE(LSTATE,J)),KIND=16)           !  ABS
-                  IF (COMP .GT. COMPMX) THEN                              
-                     COMPMX = COMP
-                     ENERCI(LSTATE) = REAL(EIGVAL(J), KIND=16)
-                     LST = J
-                  ENDIF
-  540          CONTINUE
-               IASSIG(LST) = 1
-            ENDIF
-        
-            DIFF = ENERCI(LSTATE) - ENERHARM(LSTATE)
-            WRITE (NOUT,3210) IVIRTUL,ENERHARM(LSTATE),DIFF, ENERCI(LSTATE)
-!        ENDIF
+        DIFF = ENERCI(LSTATE) - ENERHARM(LSTATE)
+        WRITE (NOUT,3210) IVIRTUL,ENERHARM(LSTATE),DIFF, ENERCI(LSTATE)
+
         CALL LWATCHTX (LSPLIT1,TIMTXT)
         WRITE (NOUT,3220) TIMTXT
         
@@ -1604,7 +1662,6 @@
         !     Initialize: C    = 1,  C    = 0.                               !
         !                  ll        k/=l                                    !
         !--------------------------------------------------------------------!
-      
             NRSPT = 0   !  RSPT order: ZCOEF(NTZERO), LADZER(NTZERO)
 
             ALLOCATE (EPTORD(0:MAX_PT), STAT = IERR)
@@ -1614,8 +1671,6 @@
             
             EPTORD = 0.0D0
             EPTORD(NRSPT) = REAL(HARMTRAN(LSTATE,LSTATE), KIND = 16)
-            
-
             PSIFUN = 0.0D0            
             PSIFUN(NRSPT,LSTATE) = (1.0D0, 0.0D0)        !  C(0)kl = Delta(k,l)
        !---------------------------------------------------------------------!
@@ -1796,7 +1851,7 @@
                DO 750 MSTATE = 1, IVIRTUL                                            
                   IF (MSTATE .EQ. LSTATE) CYCLE                                    
 !----                SUM[m=1..vir] < Psi^0(k) | V | Psi^0(m) >
-                  ELEMAT = VPERTRAN(MSTATE, KSTATE)
+                  ELEMAT = VPERTRAN(KSTATE, MSTATE)
                   IF (ELEMAT .EQ. 0.0D0) CYCLE
                   TERM = ELEMAT * PSIFUN(NRSPT-1,MSTATE)
                   SUMVIR = SUMVIR + TERM
