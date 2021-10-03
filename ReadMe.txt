@@ -8,7 +8,7 @@ RSPT_L: A realization of Large-order Reyleigh-Shrodinger Perturbation theory for
 
 Author: Xuanhao Chang
 
-RSPT_L is a fast Fortran program based on Intel oneAPI base toolkit including MKL library.
+RSPT_L is a fast Fortran program based on Intel oneAPI base-toolkit including MKL library.
 It allows one to calculate the vibrational state of linaer molecules using large order Reyleigh-Shrodinger perturbation theory.
 
 Three input files should be prepared before running:
