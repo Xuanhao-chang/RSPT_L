@@ -2,24 +2,23 @@
     Fortran Console Application : "RSPT_L" Project Overview
 ========================================================================
 
-The Intel Fortran Console Application Wizard has created this 
-"RSPT_L" project for you as a starting point.
+Date: Oct 03, 2021
 
-This file contains a summary of what you will find in each of the files 
-that make up your project.
+RSPT_L: A realization of Large-order Reyleigh-Shrodinger Perturbation theory for vibrational states of Linear Molecules
 
-RSPT_L.vfproj
-    This is the main project file for Fortran projects generated using an 
-    Application Wizard.  It contains information about the version of 
-    Intel Fortran that generated the file, and information about the 
-    platforms, configurations, and project features selected with the 
-    Application Wizard.
+Author: Xuanhao Chang
 
-RSPT_L.f90
-    This is the main source file for the Fortran Console application. 
-    It contains the program entry point.
+RSPT_L is a fast Fortran program based on Intel oneAPI base toolkit including MKL library.
+It allows one to calculate the vibrational state of linaer molecules using large order Reyleigh-Shrodinger perturbation theory.
 
-/////////////////////////////////////////////////////////////////////////////
-Other notes:
+Three input files should be prepared before running:
+
+(a) RSPT_L.ini Some key data: directories, input files, output level, FM accuracy (manissa);
+
+(b) RSPT_Molecule(Model).inp Main general inpit: parameters, RSPT series setting, etc.;
+
+(c) PARA_Molecule(Model).mol Molecular properties: NQ, Harmonic frequencies of molecule;
+
+Besides, bin file from Zero-order, cubic, quartic normal-odering Hamiltonian, Coriolis term and L_z operators should be prepared from Wolfram Mathematica programm.
 
 /////////////////////////////////////////////////////////////////////////////
