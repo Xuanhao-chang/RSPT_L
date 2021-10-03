@@ -10,6 +10,8 @@ Author: Xuanhao Chang
 
 RSPT_L is a fast Fortran program based on Intel oneAPI base-toolkit including MKL library.
 It allows one to calculate the vibrational state of linaer molecules using large order Reyleigh-Shrodinger perturbation theory.
+It is different from the RSPT_L_FM version, RSPT_L allows one two calculate model case, such as 2D Harmonic Oscillator, but Float-
+Multiprecision is not included in program.
 
 Three input files should be prepared before running:
 
@@ -19,6 +21,6 @@ Three input files should be prepared before running:
 
 (c) PARA_Molecule(Model).mol Molecular properties: NQ, Harmonic frequencies of molecule;
 
-Besides, bin file from Zero-order, cubic, quartic normal-odering Hamiltonian, Coriolis term and L_z operators should be prepared from Wolfram Mathematica programm.
+Besides, bin file from Zero-order, cubic, quartic normal-odering Hamiltonian, Coriolis term and L_z operators should be prepared from Wolfram Mathematica program.
 
 /////////////////////////////////////////////////////////////////////////////
