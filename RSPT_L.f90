@@ -36,16 +36,17 @@
     INTEGER *1, ALLOCATABLE :: LADHAM(:,:,:), LADHO(:,:,:), LADVP(:,:,:)                             !
     INTEGER *1, ALLOCATABLE :: LADLZ (:,:,:)                                                         !
     INTEGER *4, ALLOCATABLE :: ISTATE(:)                                                             !
-    INTEGER *4, ALLOCATABLE :: IQUANT(:,:), JQUANT(:,:), IEXQUANT(:,:), JEXQUANT(:,:)                !
+    INTEGER *4, ALLOCATABLE :: IQUANT(:,:), JQUANT(:,:), IEXQUANT(:,:), JEXQUANT(:,:),SELEQUANT(:,:) !
     INTEGER *4, ALLOCATABLE :: IOPBRA(:), IOPKET(:)                                                  !
     INTEGER *4, ALLOCATABLE :: IVIRTU(:,:), NQUPOL(:)                                                !
     INTEGER *4, ALLOCATABLE :: VMAXS(:), AUX1(:,:), AUX2(:,:)                                        !
     COMPLEX*16, ALLOCATABLE :: HARM(:,:), VPERT(:,:), HARMTRAN(:,:), VPERTRAN(:,:)                   !
     COMPLEX*16, ALLOCATABLE :: PROJECT(:,:), PROJTRAN(:,:), COPY1(:,:), COPY2(:,:), HAMATRE(:,:)     !
     COMPLEX*16, ALLOCATABLE :: AUX3(:,:), AUX4(:,:)                                                  !
-    REAL   *16, ALLOCATABLE :: W(:), WEX(:)                                                          !
+    REAL   *16, ALLOCATABLE :: W(:), WEX(:),ENERHO(:)                                                !
     ALLOCATABLE KPOLY(:), KEXPOLY(:)                                                                 !
-    
+    LOGICAL, ALLOCATABLE :: LOGICSTATE(:)
+ 
     INTEGER *4, ALLOCATABLE :: IASSIG(:), IDEG(:)
     REAL   *16, ALLOCATABLE :: ENERHARM(:), ENERCI(:), ENERPT(:)                                      !    
     REAL    *8, ALLOCATABLE :: ENERDEG(:)                                                             !    
@@ -59,7 +60,7 @@
     CHARACTER*16 TIMTXT
     
     CHARACTER*80 :: FILE_H(0:4),FILE_LZ
-    CHARACTER*80 :: FILE_HTOT, FILE_POLY, FILE_POLY2, FILE_HARM, FILE_PERT
+    CHARACTER*80 :: FILE_HTOT, FILE_POLY, FILE_POLY2, FILE_HARM, FILE_PERT,FILE_TEMP
     CHARACTER*80 :: QUANID
     CHARACTER*64    PATH_CUR,PATH_PRO,PATH_OUT,PATH_BIN
     COMMON /PATHS/  PATH_CUR,PATH_PRO,PATH_OUT,PATH_BIN
@@ -78,7 +79,7 @@
     CHARACTER*24 DATVER, MOLECULE
     CHARACTER* 2 VERTICL
 
-    LOGICAL      :: FLAG, STATUS
+    LOGICAL      :: FLAG,STATUS,SELECT
     LOGICAL      :: CONVER
 
     DATA NLOG,NINP,NOUT,NAUX,NSCR,NTMP /1,2,3,4,7,8/
@@ -276,14 +277,14 @@
             ELSE IF (KEYWOR .EQ. 'POLY_QUA') THEN
                READ (UNIT = LINE, FMT = "(I4)", IOSTAT = IOS) MAXQUA
             ENDIF
- !           IF (KEYWOR(1:4) .EQ. 'VIBR' .OR.                              &
- !    &          KEYWOR(1:4) .EQ. 'DATA') THEN
- !              BACKSPACE (NINP)
- !              EXIT
- !           ENDIF
- !           IF (KEYWOR(1:4) .EQ. 'TERM') THEN  !  Carry on reading input
- !              EXIT
- !           ENDIF
+            IF (KEYWOR(1:4) .EQ. 'VIBR' .OR.                              &
+     &          KEYWOR(1:4) .EQ. 'DATA') THEN
+               BACKSPACE (NINP)
+               EXIT
+            ENDIF
+            IF (KEYWOR(1:4) .EQ. 'TERM') THEN  !  Carry on reading input
+               EXIT
+            ENDIF
             IF (KEYWOR(1:4) .EQ. 'STOP') THEN  !  Close input file
                CLOSE (NINP)
                EXIT
@@ -298,7 +299,48 @@
  1210 FORMAT (/'RSPT: Input not found, using default parameters.')
 
       MULMOD = MIN (NQ,MULMOD)                                                  !!  Attention should be paid in MIN
+!-----------------------------------------------------------------------------------------------
+!   Options for selected states calculation
+!-----------------------------------------------------------------------------------------------
+      INQUIRE (UNIT = NINP, OPENED = STATUS)
+      IF (STATUS) THEN
+         READ (NINP, "(A4)", ERR = 270) CONTROL
 
+      IF (CONTROL .EQ. 'VIBR') THEN
+         IF (NOPTST .GE. 0) STOP 'NSTOPT = -1 expected for VIBR'
+         NOPTST = 0  !  Overrides standard user-defined setting
+
+         ALLOCATE (SELEQUANT(NQ,0:255), STAT = IERR)
+         LOCERR = 3;  IF (IERR .NE. 0) GO TO 990
+
+         DO Q = 1, NQ
+            SELEQUANT(Q,0) = 0
+         END DO
+         DO I = 1, 255
+            READ (NINP,"(15I4)", ERR = 260) (SELEQUANT(Q,I),Q=1,NQ)
+            NSELSTATE = I
+         END DO
+!----       Input ends by appearing of next Keyword
+  260    BACKSPACE (NINP)
+
+         WRITE (NOUT,2110) NSELSTATE
+         DO I = 0, NSELSTATE
+            WRITE (NOUT,2120) I,(SELEQUANT(Q,I),Q=1,NQ)
+         END DO
+
+      ELSE
+         WRITE (*,2130) NOPTST
+         BACKSPACE (NINP)
+      ENDIF
+
+      ENDIF
+270   CONTINUE
+
+2110  FORMAT (/'Total number of user-defined states =',I4)
+2120  FORMAT ('State number (',I4,') -- Quantum numbers:'/(5I4,2X,5I4))
+2130  FORMAT (/'Specific vibrational states not provided, ',              &     !  2100
+     &   'using all states up to ',I2,' quanta.')
+      
 !----------------------------------------------------------------------------
       WRITE (NOUT,1300) REAL(NUMVER)/100.0,DATVER,MOLECULE
       CALL TIMDAT (NOUT)
@@ -1494,10 +1536,77 @@
           ENDIF
       ENDDO
 
+!---  Individual allocate harmonic energy
+      ALLOCATE(ENERHO(IVIRTUL))
+      DO I = 1, IVIRTUL
+          CALL ENERHARMDEG (NQEX, NQIN, WEX,IVIRTU(1:NQEX,I) ,EZERO, EHARM)         
+          ENERHO( I) = EHARM    
+      ENDDO
+!---  Assistant Array used for sorting ENERHO 
+!     It is because HARMTRAN is sorted by increasing order of Harmonic energy, But IVIRTU is generated by the order of Polyad      
+      ALLOCATE(AUX1(1, IVIRTUL))
+      CALL RQSORT(IVIRTUL, ENERHO, AUX1(1,:))
+      
+!---  Options for selected states calculation
+      IF (SELECT) THEN
+        ALLOCATE(LOGICSTATE(NSTATE))
+        LOGICSTATE = .FALSE.
+        NMATCH = 0
+        DO I = 0, NSELSTATE
+            DO J = 1, NSTATE   
+                FLAG = .TRUE. 
+                DO Q = 1, NQ
+                    IF (SELEQUANT(Q,I) .EQ. IQUANT(Q,J)) THEN
+                        FLAG = FLAG .AND. .TRUE.
+                    ELSE 
+                        FLAG = .FALSE.
+                    ENDIF
+                ENDDO
+                IF (FLAG) THEN
+                    LOGICSTATE(J) = .TRUE.
+                    NMATCH = NMATCH + 1
+                ENDIF
+            ENDDO
+        ENDDO
+        DEALLOCATE(SELEQUANT)
+        IF (NMATCH < NSELSTATE+1) WRITE (*,"('The energy of selected states is higher than EREF_MAX, or it is not contained in Sayvetz basis set')") 
+      ENDIF
+
+!---  Prepare/read files for interupted calculation 
+      FILE_TEMP = TRIM(PATH_CUR) // 'RSPT_' // TRIM(MOLECULE) // '.tmp'
+      IF (NSTART .EQ. 0) THEN
+         OPEN (UNIT = NTMP, FILE = FILE_TEMP, STATUS = 'REPLACE',        &
+     &      ACTION = 'WRITE', FORM = 'FORMATTED')
+      ELSE
+         OPEN (UNIT = NTMP, FILE = FILE_TEMP, STATUS = 'OLD',            &
+     &      ACTION = 'READWRITE', FORM = 'FORMATTED')
+      ENDIF      
+      
       ENERCI = 0.0D0
       IASSIG = 0
      
       DO 900 LSTATE = 1, NSTATE
+          IF (SELECT) THEN
+              IF (.NOT. LOGICSTATE(LSTATE)) CYCLE
+          ENDIF
+          
+!          IF (LSTATE .LT. NSTART) THEN 
+!              READ (NTMP,3150) LST,(ISTATE(J),J=1,NQ)
+!              WRITE (UNIT = QUANID, FMT = "('(',24(I2:','))")             &
+!     &            (ISTATE(Q),Q=1,NQ)
+!              QUANID = TRIM(QUANID) // ')'
+!              IF (LST .NE. LSTATE) STOP 'Wrong state index in *.tmp file'
+!              CALL RDFMNUM (NTMP,LST,1,ENERHARMfm(LSTATE))
+!              CALL RDFMNUM (NTMP,LST,1,ENERCIfm  (LSTATE))
+!              CALL RDFMNUM (NTMP,LST,1,ENERPT    (LSTATE))
+!              WRITE (*,3160) LSTATE,TRIM(QUANID),REAL16(ENERHARMfm(LSTATE)),  &
+!     &                  REAL16(ENERCIfm(LSTATE)),MAX_PT,REAL16(ENERPT(LSTATE))
+!              CYCLE
+!          ENDIF
+!3150      FORMAT (I4,2X,24I4)
+!3160      FORMAT (I4,2X,A,':  Energy, H(0) =',F20.12,'  Energy, VCI =',   &
+!     &            F20.12,'  Energy, RSPT(',I3,') =',ES24.16)
+          
          
          WRITE (NOUT,9900)
          CALL WATCH (ISPLIT);  CALL LWATCH (LSPLIT0)
@@ -1632,14 +1741,17 @@
                 EZERO = REAL(HARMTRAN(I,I), KIND = 16)
                 IF (ABS(ENERHARM(LSTATE)- EZERO ) .LT. 1.0E-6 ) THEN                        ! 1.0E-3 Should be improved
                     NDEG = NDEG + 1
-                    JQUANT(:,NDEG) = IVIRTU(:,I)                                            ! Record Degenerate States
                     IDEG(NDEG)     = I                                                      ! Record The indecies of Degenerate States
+                    JQUANT(:,NDEG) = IVIRTU(:,AUX1(1,I))                                            ! Record Degenerate States
+                    !DO J = 1, IVIRTUL
+                    !    IF (AUX1(1,J) .EQ. I) JQUANT(:,NDEG) = IVIRTU(:,J)                                  ! Record Degenerate States
+                    !ENDDO
                 ENDIF
             ENDDO
             WRITE(*   , 3300) NDEG
             WRITE(NOUT, 3300) NDEG
             DO I = 1, NDEG
-                IF (IDEG(I) .EQ. LSTATE) CYCLE
+                IF (AUX1(1,IDEG(I)) .EQ. LSTATE) CYCLE                              !IDEG(I)
                 WRITE(NOUT, 3310) NQ, (JQUANT(Q,I),Q=1,NQ) !TRIM(QUANID)
             ENDDO
             DEALLOCATE(JQUANT)
@@ -1945,7 +2057,7 @@
         
         IF (NDEG > 1) THEN    
             DO I = 1, NDEG
-                IF (LSTATE .EQ. IDEG(I)) EXIT
+                IF (LSTATE .EQ. AUX1(1,IDEG(I))) EXIT           !IDEG(I)
             ENDDO
             INDEX = I                                                            ! Record Index of State among Degenerate Subspace
             IF (INDEX .EQ. 1 )WRITE(NOUT," ('The reference state is the', I3, '-st state among the degenerate pair ' )" ) INDEX
@@ -2060,7 +2172,7 @@
             LOOP1: DO  KSTATE = 1, IVIRTUL                                                  
                 
                 LOOP2: DO I = 1, NDEG
-                    IF (KSTATE .EQ. IDEG(I)) CYCLE LOOP1  
+                    IF (KSTATE .EQ. AUX1(1,IDEG(I))) CYCLE LOOP1  
                 ENDDO LOOP2
                
                 SUMVIR = (0.0D0,0.0D0)
@@ -2206,7 +2318,7 @@
             
             LOOP3: DO KSTATE = 1, IVIRTUL
                 LOOP4: DO I = 1, NDEG
-                    IF (KSTATE .EQ. IDEG(I)) CYCLE LOOP3  
+                    IF (KSTATE .EQ. AUX1(1,IDEG(I))) CYCLE LOOP3  
                 ENDDO LOOP4
             
                 ICENT1 = 100 * KSTATE / IVIRTUL
